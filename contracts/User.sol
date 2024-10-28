@@ -3,10 +3,19 @@ pragma solidity ^0.8.0;
 
 contract User {
 
-    // TODO: Define customer struct
-    // TODO: Define store struct
+    struct Customer {
+        uint256 id;
+        address customerAddress;
+        uint256 tier;
+    }
 
-    // TODO: store customer info in a mapping
-    // TODO: store store info in a mapping
+    struct Store {
+        uint256 id;
+        address storeAddress;
+    }
+    
+    mapping(address => Customer) public customers;
+
+    mapping(address => Store) public stores;
 
 }
