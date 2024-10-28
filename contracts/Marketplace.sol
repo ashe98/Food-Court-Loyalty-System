@@ -3,7 +3,14 @@ pragma solidity ^0.8.0;
 
 contract Marketplace {
 
-    // TODO: Define Product struct
+    struct Product {
+        uint256 id;
+        uint256 price;
+        uint256 quantity;
+        bool claimableOnce;
+        bool groupClaimable;
+        uint256 minimumTierRequired;
+    }
 
     // TODO: store a mapping of address -> list of products claimed
 
