@@ -81,7 +81,7 @@ contract RewardToken is ERC20, Ownable {
     //////////////////////////////////////////
 
     // Override transfer function to allow transfers only from customers->stores and stores->owner
-    function transfer(address to, uint256 amount) public virtual override burnExpiredTokens() onlyRegisteredUsers() returns(bool) {
+    function transfer(address to, uint256 amount) public override onlyRegisteredUsers() burnExpiredTokens() returns(bool) {
         address sender = _msgSender();
         if (isCustomer[sender]) {
             require(isStore[to], "Tokens from customers can only be transferred to stores");
@@ -95,7 +95,7 @@ contract RewardToken is ERC20, Ownable {
 
 
     // Override transferFrom function to allow transfers only from customers to stores
-    function transferFrom(address from, address to, uint256 value) public virtual override burnExpiredTokens() onlyRegisteredUsers() returns (bool) {
+    function transferFrom(address from, address to, uint256 value) public override onlyRegisteredUsers() burnExpiredTokens() returns (bool) {
         if (isCustomer[from]) {
             require(isStore[to], "Tokens from customers can only be transferred to stores");
         } else if (isStore[from]) {
@@ -134,6 +134,11 @@ contract RewardToken is ERC20, Ownable {
     function recordTransaction(address customer, uint256 amount, uint256 transactionId) public onlyOwner() {
         uint256 expiration = block.timestamp + 4 * 6 weeks; // 6 months
         mintTokens(customer, amount, expiration, transactionId);
+    }
+
+    function redeemTokensForCustomer(address store, uint256 amount) public burnExpiredTokens() {
+        require(balanceOf(_msgSender()) >= amount, "Customer does not have enough tokens to redeem");
+        transfer(store, amount);
     }
 
     //////////////////////////////////////////
