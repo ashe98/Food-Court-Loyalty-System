@@ -4,10 +4,15 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+import "./models/Product.sol";
+import "./Marketplace.sol";
+
 contract RewardToken is ERC20, Ownable {
     constructor(
-        address _owner
-    ) ERC20("RewardToken", "RT") Ownable(msg.sender) {}
+        address marketplaceAddress
+    ) ERC20("RewardToken", "RT") Ownable(msg.sender) {
+        marketplace = Marketplace(marketplaceAddress);
+    }
 
     // Struct to store how many tokens a customer has and when they expire
     struct TokenBatch {
@@ -19,6 +24,8 @@ contract RewardToken is ERC20, Ownable {
     mapping(address => TokenBatch[]) private tokenBatches;
     mapping(address => bool) private isStore;
     mapping(address => bool) private isCustomer;
+
+    Marketplace private marketplace;
 
     //////////////////////////////////////////
     //
@@ -168,14 +175,16 @@ contract RewardToken is ERC20, Ownable {
     }
 
     function redeemTokensForCustomer(
-        address store,
-        uint256 amount
+        uint256 productId,
+        address store
     ) public burnExpiredTokens {
+        Product memory productToRedeem = marketplace.getProductById(productId); // get Product details
         require(
-            balanceOf(_msgSender()) >= amount,
+            balanceOf(_msgSender()) < productToRedeem.price,
             "Customer does not have enough tokens to redeem"
         );
-        transfer(store, amount);
+        transfer(store, productToRedeem.price);
+        marketplace.redeemProduct(productId, 1); // reduce product quantity
     }
 
     //////////////////////////////////////////

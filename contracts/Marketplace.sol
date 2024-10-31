@@ -1,17 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-contract Marketplace {
-    struct Product {
-        uint256 id;
-        address storeAddress;
-        uint256 price;
-        uint256 quantity;
-        bool claimableOnce;
-        bool groupClaimable;
-        uint256 minimumTierRequired;
-        bool isActive;
-    }
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "./models/Product.sol";
+
+contract Marketplace is Ownable {
+    constructor() Ownable(msg.sender) {}
 
     struct ClaimRecord {
         uint256 productId;
@@ -26,11 +20,28 @@ contract Marketplace {
         _;
     }
 
-    // TODO: store a mapping of address -> list of products claimed
+    modifier whiteListedContractsOnly() {
+        bool isWhiteListed = false;
+        for (uint256 i = 0; i < whiteListedContracts.length; i++) {
+            if (whiteListedContracts[i] == msg.sender) {
+                isWhiteListed = true;
+                break;
+            }
+        }
+        require(isWhiteListed, "Not a white listed contract");
+        _;
+    }
+
     mapping(uint256 => Product) private products;
     mapping(address => mapping(uint256 => bool)) private hasUserClaimed; // user -> productId -> claimed
     mapping(address => ClaimRecord[]) private userClaimHistory;
     uint256[] private allProductIds;
+
+    address[] whiteListedContracts;
+
+    function addWhiteListedContract(address _contract) public onlyOwner {
+        whiteListedContracts.push(_contract);
+    }
 
     event ProductAdded(
         uint256 indexed productId,
@@ -51,7 +62,6 @@ contract Marketplace {
     );
     event ProductStatusChanged(uint256 indexed productId, bool isActive);
 
-    // TODO: Define method to add product
     function addProduct(
         uint256 _productId,
         string memory _name,
@@ -79,14 +89,13 @@ contract Marketplace {
         return _productId;
     }
 
-    // TODO: Define method to get product by id
     function getProductById(
         uint256 _productId
     ) public view productExists(_productId) returns (Product memory) {
         return products[_productId];
     }
 
-    // TODO: Define method to get all products
+    // Define method to get all products
     function getAllProducts() public view returns (Product[] memory) {
         Product[] memory allProducts = new Product[](allProductIds.length);
 
@@ -97,7 +106,7 @@ contract Marketplace {
         return allProducts;
     }
 
-    // TODO: Define method to delete product
+    // Define method to delete product
     function deleteProduct(
         uint256 _productId
     ) public productExists(_productId) {
@@ -110,15 +119,21 @@ contract Marketplace {
         emit ProductStatusChanged(_productId, false);
     }
 
-    // TODO: Define public method to reduce quantity of product when purchased
-    function reduceProductQuantity(
+    // Define public method to reduce quantity of product when purchased
+    function redeemProduct(
         uint256 _productId,
         uint256 _quantity
-    ) public productExists(_productId) {
+    ) public productExists(_productId) whiteListedContractsOnly {
         require(
             products[_productId].quantity >= _quantity,
             "Not enough quantity"
         );
+        require(
+            hasUserClaimed[tx.origin][_productId] &&
+                products[_productId].claimableOnce,
+            "Already claimed by user"
+        );
+        hasUserClaimed[msg.sender][_productId] = true;
         products[_productId].quantity -= _quantity;
     }
 
