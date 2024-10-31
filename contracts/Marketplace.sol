@@ -115,6 +115,7 @@ contract Marketplace is Ownable {
             "Not product owner"
         );
         products[_productId].isActive = false;
+        products[_productId].quantity = 0;
         emit ProductDeleted(_productId);
         emit ProductStatusChanged(_productId, false);
     }

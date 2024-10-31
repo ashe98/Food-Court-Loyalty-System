@@ -24,6 +24,8 @@ contract RewardToken is ERC20, Ownable {
     mapping(address => TokenBatch[]) private tokenBatches;
     mapping(address => bool) private isStore;
     mapping(address => bool) private isCustomer;
+    mapping(address => mapping(address => uint256))
+        private userLastTransactionTimestampForStore;
 
     Marketplace private marketplace;
 
@@ -168,10 +170,13 @@ contract RewardToken is ERC20, Ownable {
     function recordTransaction(
         address customer,
         uint256 amount,
-        uint256 transactionId
+        uint256 transactionId,
+        address storeAddress
     ) public onlyOwner {
         uint256 expiration = block.timestamp + 4 * 6 weeks; // 6 months
         mintTokens(customer, amount, expiration, transactionId);
+        userLastTransactionTimestampForStore[customer][storeAddress] = block
+            .timestamp;
     }
 
     function redeemTokensForCustomer(
@@ -179,6 +184,12 @@ contract RewardToken is ERC20, Ownable {
         address store
     ) public burnExpiredTokens {
         Product memory productToRedeem = marketplace.getProductById(productId); // get Product details
+        // user should have made a transaction in the last 30 days at that store before redeeming a product
+        require(
+            block.timestamp -
+                userLastTransactionTimestampForStore[_msgSender()][store] <=
+                30 days
+        );
         require(
             balanceOf(_msgSender()) < productToRedeem.price,
             "Customer does not have enough tokens to redeem"
