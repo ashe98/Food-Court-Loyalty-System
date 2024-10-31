@@ -1,45 +1,68 @@
-// SPDX-License-Identifier: MIT 
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-contract Marketplace {
-    struct Product {
-        uint256 id;
-        address storeAddress;
-        uint256 price;
-        uint256 quantity;
-        bool claimableOnce;
-        bool groupClaimable;
-        uint256 minimumTierRequired;
-        bool isActive;
-    }
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "./models/Product.sol";
+
+contract Marketplace is Ownable {
+    constructor() Ownable(msg.sender) {}
 
     struct ClaimRecord {
-    uint256 productId;
-    uint256 timestamp;
-    uint256 quantity;
+        uint256 productId;
+        uint256 timestamp;
+        uint256 quantity;
     }
 
     //Modifiers
     modifier productExists(uint256 _productId) {
         require(products[_productId].id != 0, "Product does not exist");
         require(products[_productId].isActive, "Product is not active");
-    _;
+        _;
     }
 
-    // TODO: store a mapping of address -> list of products claimed
+    modifier whiteListedContractsOnly() {
+        bool isWhiteListed = false;
+        for (uint256 i = 0; i < whiteListedContracts.length; i++) {
+            if (whiteListedContracts[i] == msg.sender) {
+                isWhiteListed = true;
+                break;
+            }
+        }
+        require(isWhiteListed, "Not a white listed contract");
+        _;
+    }
+
     mapping(uint256 => Product) private products;
     mapping(address => mapping(uint256 => bool)) private hasUserClaimed; // user -> productId -> claimed
-    mapping(address => ClaimRecord[]) private userClaimHistory;
+
     uint256[] private allProductIds;
 
-    event ProductAdded(uint256 indexed productId, address indexed store, string name, uint256 price);
-    event ProductUpdated(uint256 indexed productId, uint256 quantity, uint256 price);
+    address[] whiteListedContracts;
+
+    function addWhiteListedContract(address _contract) public onlyOwner {
+        whiteListedContracts.push(_contract);
+    }
+
+    event ProductAdded(
+        uint256 indexed productId,
+        address indexed store,
+        string name,
+        uint256 price
+    );
+    event ProductUpdated(
+        uint256 indexed productId,
+        uint256 quantity,
+        uint256 price
+    );
     event ProductDeleted(uint256 indexed productId);
-    event ProductClaimed(address indexed user, uint256 indexed productId, uint256 quantity);
+    event ProductClaimed(
+        address indexed user,
+        uint256 indexed productId,
+        uint256 quantity
+    );
     event ProductStatusChanged(uint256 indexed productId, bool isActive);
 
-    // TODO: Define method to add product
-     function addProduct(
+    function addProduct(
         uint256 _productId,
         string memory _name,
         uint256 _price,
@@ -50,7 +73,7 @@ contract Marketplace {
     ) public returns (uint256) {
         require(_price > 0, "Price must be greater than 0");
         require(_quantity > 0, "Quantity must be greater than 0");
-        
+
         products[_productId] = Product({
             id: _productId,
             storeAddress: msg.sender,
@@ -66,58 +89,53 @@ contract Marketplace {
         return _productId;
     }
 
-    // TODO: Define method to get product by id
-    function getProductById(uint256 _productId) 
-        public
-        view 
-        productExists(_productId) 
-        returns (Product memory) 
-    {
+    function getProductById(
+        uint256 _productId
+    ) public view productExists(_productId) returns (Product memory) {
         return products[_productId];
     }
 
-    // TODO: Define method to get all products
-    function getAllProducts() 
-        public
-        view 
-        returns (Product[] memory) 
-    {
+    // Define method to get all products
+    function getAllProducts() public view returns (Product[] memory) {
         Product[] memory allProducts = new Product[](allProductIds.length);
-        
+
         for (uint256 i = 0; i < allProductIds.length; i++) {
             allProducts[i] = products[allProductIds[i]];
         }
-        
+
         return allProducts;
     }
 
-    // TODO: Define method to delete product
-    function deleteProduct(uint256 _productId) 
-        public
-        productExists(_productId) 
-    {
-        require(products[_productId].storeAddress == msg.sender, "Not product owner");
+    // Define method to delete product
+    function deleteProduct(
+        uint256 _productId
+    ) public productExists(_productId) {
+        require(
+            products[_productId].storeAddress == msg.sender,
+            "Not product owner"
+        );
         products[_productId].isActive = false;
+        products[_productId].quantity = 0;
         emit ProductDeleted(_productId);
         emit ProductStatusChanged(_productId, false);
     }
 
-    // TODO: Define public method to reduce quantity of product when purchased
-    function reduceProductQuantity(uint256 _productId, uint256 _quantity) 
-        public 
-        productExists(_productId) 
-    {
-        require(products[_productId].quantity >= _quantity, "Not enough quantity");
+    // Define public method to reduce quantity of product when purchased
+    function redeemProduct(
+        uint256 _productId,
+        uint256 _quantity
+    ) public productExists(_productId) whiteListedContractsOnly {
+        require(
+            products[_productId].quantity >= _quantity,
+            "Not enough quantity"
+        );
+        require(
+            hasUserClaimed[tx.origin][_productId] &&
+                products[_productId].claimableOnce,
+            "Already claimed by user"
+        );
+        hasUserClaimed[msg.sender][_productId] = true;
         products[_productId].quantity -= _quantity;
-    }
-
-    //Method to get user claim history
-    function getUserClaimHistory(address _user) 
-        public 
-        view 
-        returns (ClaimRecord[] memory) 
-    {
-        return userClaimHistory[_user];
     }
 
     //Method to update product
@@ -125,11 +143,11 @@ contract Marketplace {
         uint256 _productId,
         uint256 _price,
         uint256 _quantity
-    ) 
-        public
-        productExists(_productId) 
-    {
-        require(products[_productId].storeAddress == msg.sender, "Not product owner");
+    ) public productExists(_productId) {
+        require(
+            products[_productId].storeAddress == msg.sender,
+            "Not product owner"
+        );
         products[_productId].price = _price;
         products[_productId].quantity = _quantity;
         emit ProductUpdated(_productId, _quantity, _price);
