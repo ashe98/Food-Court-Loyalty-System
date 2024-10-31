@@ -34,7 +34,7 @@ contract Marketplace is Ownable {
 
     mapping(uint256 => Product) private products;
     mapping(address => mapping(uint256 => bool)) private hasUserClaimed; // user -> productId -> claimed
-    mapping(address => ClaimRecord[]) private userClaimHistory;
+
     uint256[] private allProductIds;
 
     address[] whiteListedContracts;
@@ -136,13 +136,6 @@ contract Marketplace is Ownable {
         );
         hasUserClaimed[msg.sender][_productId] = true;
         products[_productId].quantity -= _quantity;
-    }
-
-    //Method to get user claim history
-    function getUserClaimHistory(
-        address _user
-    ) public view returns (ClaimRecord[] memory) {
-        return userClaimHistory[_user];
     }
 
     //Method to update product
