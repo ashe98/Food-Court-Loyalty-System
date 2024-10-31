@@ -1,5 +1,6 @@
 {
     "solidity.compileUsingRemoteVersion": "v0.8.21+commit.d9974bed",
     "solidity.packageDefaultDependenciesDirectory": "node_modules",
-    "solidity.packageDefaultDependenciesContractsDirectory": ""
+    "solidity.packageDefaultDependenciesContractsDirectory": "",
+    "editor.formatOnSave": true
 }
