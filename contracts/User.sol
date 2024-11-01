@@ -11,7 +11,6 @@ contract User {
     struct Customer {
         address customerAddress;
         Tier tier;
-        uint256 balance;
     }
 
     struct Store {
@@ -25,15 +24,14 @@ contract User {
     event StoreRegistered(address storeAddress);
 
     // Function to register new customer
-    function registerCustomer(Tier _tier, uint256 _balance) public {
+    function registerCustomer(Tier _tier) public {
         require(
             customers[msg.sender].customerAddress == address(0),
             "Customer already registered"
         );
         Customer memory newCustomer = Customer({
             customerAddress: msg.sender,
-            tier: _tier,
-            balance: _balance
+            tier: _tier
         });
         customers[msg.sender] = newCustomer;
         emit CustomerRegistered(msg.sender, uint256(_tier));
@@ -49,24 +47,18 @@ contract User {
     //Function to get customer details
     function getCustomer(
         address customerAddress
-    ) public view returns (address, Tier, uint256) {
+    ) public view returns (address, Tier) {
         require(
             customers[customerAddress].customerAddress != address(0),
             "Customer not found"
         );
         Customer memory customer = customers[customerAddress];
-        return (customer.customerAddress, customer.tier, customer.balance);
+        return (customer.customerAddress, customer.tier);
     }
 
-    //Function to get store details
-    function getStore(address storeAddress) public view returns (address) {
-        require(
-            stores[storeAddress].storeAddress != address(0),
-            "Store not found"
-        );
-
-        Store memory store = stores[storeAddress];
-        return store.storeAddress;
+    // Function to check if a store exists
+    function storeExists(address storeAddress) public view returns (bool) {
+        return stores[storeAddress].storeAddress != address(0);
     }
 
     //Function to return the tier of user
