@@ -12,11 +12,10 @@ contract('User', (accounts) => {
         userInstance = await User.deployed();
     });
 
-    it('Register a new customer with specified tier and balance', async () => {
+    it('Register a new customer with specified tier ', async () => {
         let tier = 0; // Silver
-        let balance = 100;
  
-        let result = await userInstance.registerCustomer(tier, balance, { from: customer1 });
+        let result = await userInstance.registerCustomer(tier,  { from: customer1 });
 
         truffleAssert.eventEmitted(result, 'CustomerRegistered', (ev) => {
             return ev.customerAddress === customer1 && ev.tier.toString() === tier.toString();
@@ -26,20 +25,18 @@ contract('User', (accounts) => {
 
         assert.strictEqual(customerDetails[0], customer1, "Customer address mismatch!");
         assert.strictEqual(customerDetails[1].toNumber(), tier, "Customer tier mismatch!");
-        assert.strictEqual(customerDetails[2].toNumber(), balance, "Customer balance mismatch!");
     });
     
     
     it('Register a new store', async () => {
         let result = await userInstance.registerStore({ from: store });
-
         truffleAssert.eventEmitted(result, 'StoreRegistered', (ev) => {
             return ev.storeAddress === store;
         });
-
-        let storeDetails = await userInstance.getStore(store);
-        assert.strictEqual(storeDetails, store, "Store address mismatch");
+        let exists = await userInstance.storeExists(store);
+        assert.isTrue(exists, "Store should exist after registration");
     });
+    
 
     it('Get tier of a customer', async () => {
         let tier = await userInstance.getUserTier(customer1);
@@ -67,12 +64,8 @@ contract('User', (accounts) => {
 
     it('Delete a store', async () => {
         await userInstance.deleteStore(store, { from: owner });
-
-        try {
-            await userInstance.getStore(store);
-            assert.fail("Expected error not received");
-        } catch (error) {
-            assert(error.message.includes("Store not found"), "Expected 'Store not found' error");
-        }
+        let exists = await userInstance.storeExists(store);
+        assert.isFalse(exists, "Store should not exist after deletion");
     });
+       
 });
