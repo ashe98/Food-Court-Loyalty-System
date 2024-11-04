@@ -32,6 +32,25 @@ contract RewardToken is ERC20, Ownable {
 
     Marketplace private marketplace;
 
+    event StoreAdded(address indexed store);
+    event CustomerAdded(address indexed customer);
+    event TokensMinted(address indexed customer, uint256 amount, uint256 expiration);
+    event TokensBurned(address indexed customer, uint256 amount);
+    event GroupCreated(address indexed originator, uint256 timestamp);
+    event GroupJoined(address indexed member, address indexed groupOriginator);
+    event GroupDeleted(address indexed originator);
+    event TransactionRecorded(
+        address indexed customer,
+        uint256 amount,
+        uint256 transactionId,
+        address indexed store
+        );
+    event GroupTransactionCompleted(
+        address indexed groupOriginator,
+        uint256 indexed productId,
+        uint256 memberCount,
+        uint256 totalAmount
+        );
     //////////////////////////////////////////
     //
     // Modifiers
@@ -136,10 +155,12 @@ contract RewardToken is ERC20, Ownable {
 
     function addStore(address store) public {
         isStore[store] = true;
+        emit StoreAdded(store);
     }
 
     function addCustomer(address customer) public {
         isCustomer[customer] = true;
+        emit CustomerAdded(customer);
     }
 
     // The backend(owner) should make necessary checks to verify the transaction before calling this function
@@ -154,6 +175,7 @@ contract RewardToken is ERC20, Ownable {
         mintTokens(customer, amount, expiration, transactionId);
         userLastTransactionTimestampForStore[customer][storeAddress] = block
             .timestamp;
+        emit TransactionRecorded(customer, amount, transactionId, storeAddress);
     }
 
     function redeemTokensForCustomer(
@@ -174,7 +196,8 @@ contract RewardToken is ERC20, Ownable {
         marketplace.redeemProduct(productId, 1); // reduce product quantity
         transfer(store, productToRedeem.price);
     }
-
+    
+    // Creates a new group for group purchases
     function createGroup() public burnExpiredTokens {
         address customer = _msgSender();
         require(
@@ -188,6 +211,7 @@ contract RewardToken is ERC20, Ownable {
         address[] memory members = new address[](5);
         members[0] = customer;
         groups[customer] = Group(customer, members, block.timestamp);
+        emit GroupCreated(customer, block.timestamp);
     }
 
     function joinGroup(address groupOriginator) public burnExpiredTokens {
@@ -208,6 +232,7 @@ contract RewardToken is ERC20, Ownable {
             );
         }
         groups[groupOriginator].members.push(customer);
+        emit GroupJoined(customer, groupOriginator); 
     }
 
     function makeGroupTransaction(
@@ -249,7 +274,12 @@ contract RewardToken is ERC20, Ownable {
             address member = groups[customer].members[i];
             transferFrom(member, store, productToRedeem.price / groupSize);
         }
-
+        emit GroupTransactionCompleted(
+            customer,
+            productId,
+            groupSize,
+            productToRedeem.price
+        );
         deleteGroup(customer);
     }
 
@@ -258,7 +288,7 @@ contract RewardToken is ERC20, Ownable {
     // Helper/Internal functions
     //
     //////////////////////////////////////////
-
+    // Mints new tokens and adds them to customer's batch
     function mintTokens(
         address customer,
         uint256 amount,
@@ -269,6 +299,7 @@ contract RewardToken is ERC20, Ownable {
             TokenBatch(transactionId, amount, expiration)
         );
         _mint(customer, amount);
+        emit TokensMinted(customer, amount, expiration);
     }
 
     function _burnExpiredTokens(address customer) internal {
@@ -301,11 +332,13 @@ contract RewardToken is ERC20, Ownable {
             }
             tokenBatches[customer] = newTokenBatches;
             _burn(customer, expiredAmount); // burn the expired token amount
+            emit TokensBurned(customer, expiredAmount);
         }
     }
 
     function deleteGroup(address customer) internal {
         groups[customer] = Group(address(0), new address[](0), 0);
+        emit GroupDeleted(customer);
     }
 
     //////////////////////////////////////////
