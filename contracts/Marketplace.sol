@@ -7,13 +7,12 @@ import "./models/Product.sol";
 contract Marketplace is Ownable {
     constructor() Ownable(msg.sender) {}
 
-    struct ClaimRecord {
-        uint256 productId;
-        uint256 timestamp;
-        uint256 quantity;
-    }
+    //////////////////////////////////////////
+    //
+    // Modifiers
+    //
+    //////////////////////////////////////////
 
-    //Modifiers
     modifier productExists(uint256 _productId) {
         require(products[_productId].id != 0, "Product does not exist");
         require(products[_productId].isActive, "Product is not active");
@@ -32,6 +31,16 @@ contract Marketplace is Ownable {
         _;
     }
 
+    // Allow only product owners or contract owners (ADMIN) to perform certain actions
+    modifier productOwnerOnly(uint256 _productId) {
+        require(
+            products[_productId].storeAddress == msg.sender ||
+                owner() == msg.sender,
+            "Not product owner"
+        );
+        _;
+    }
+
     mapping(uint256 => Product) private products;
     mapping(address => mapping(uint256 => bool)) private hasUserClaimed; // user -> productId -> claimed
 
@@ -42,6 +51,14 @@ contract Marketplace is Ownable {
     function addWhiteListedContract(address _contract) public onlyOwner {
         whiteListedContracts.push(_contract);
     }
+
+    //////////////////////////////////////////
+
+    //////////////////////////////////////////
+    //
+    // Events
+    //
+    //////////////////////////////////////////
 
     event ProductAdded(
         uint256 indexed productId,
@@ -61,6 +78,14 @@ contract Marketplace is Ownable {
         uint256 quantity
     );
     event ProductStatusChanged(uint256 indexed productId, bool isActive);
+
+    //////////////////////////////////////////
+
+    //////////////////////////////////////////
+    //
+    // Public functions
+    //
+    //////////////////////////////////////////
 
     function addProduct(
         uint256 _productId,
@@ -109,11 +134,7 @@ contract Marketplace is Ownable {
     // Define method to delete product
     function deleteProduct(
         uint256 _productId
-    ) public productExists(_productId) {
-        require(
-            products[_productId].storeAddress == msg.sender,
-            "Not product owner"
-        );
+    ) public productExists(_productId) productOwnerOnly(_productId) {
         products[_productId].isActive = false;
         products[_productId].quantity = 0;
         emit ProductDeleted(_productId);
@@ -143,11 +164,7 @@ contract Marketplace is Ownable {
         uint256 _productId,
         uint256 _price,
         uint256 _quantity
-    ) public productExists(_productId) {
-        require(
-            products[_productId].storeAddress == msg.sender,
-            "Not product owner"
-        );
+    ) public productExists(_productId) productOwnerOnly(_productId) {
         products[_productId].price = _price;
         products[_productId].quantity = _quantity;
         emit ProductUpdated(_productId, _quantity, _price);
