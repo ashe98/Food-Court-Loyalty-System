@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-contract User {
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract User is Ownable {
     enum Tier {
         Silver,
         Gold,
         Diamond
     }
+
+    constructor() Ownable(msg.sender) {}
 
     struct Customer {
         address customerAddress;
@@ -15,6 +19,24 @@ contract User {
 
     struct Store {
         address storeAddress;
+    }
+
+    address[] whiteListedContracts;
+
+    modifier whiteListedContractsOnly() {
+        bool isWhiteListed = false;
+        for (uint256 i = 0; i < whiteListedContracts.length; i++) {
+            if (whiteListedContracts[i] == msg.sender) {
+                isWhiteListed = true;
+                break;
+            }
+        }
+        require(isWhiteListed, "Not a white listed contract");
+        _;
+    }
+
+    function addWhiteListedContract(address _contract) public onlyOwner {
+        whiteListedContracts.push(_contract);
     }
 
     mapping(address => Customer) public customers;
