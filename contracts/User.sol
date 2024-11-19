@@ -3,13 +3,9 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract User is Ownable {
-    enum Tier {
-        Silver,
-        Gold,
-        Diamond
-    }
+import "./models/Tier.sol";
 
+contract User is Ownable {
     constructor() Ownable(msg.sender) {}
 
     struct Customer {
