@@ -3,6 +3,8 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+import "./Constants.sol";
+
 import "./models/Tier.sol";
 
 contract User is Ownable {
@@ -25,6 +27,8 @@ contract User is Ownable {
 
     address[] whiteListedContracts;
 
+    ConstantsContract private constants;
+
     modifier whiteListedContractsOnly() {
         bool isWhiteListed = false;
         for (uint256 i = 0; i < whiteListedContracts.length; i++) {
@@ -39,6 +43,15 @@ contract User is Ownable {
 
     function addWhiteListedContract(address _contract) public onlyOwner {
         whiteListedContracts.push(_contract);
+    }
+
+    // Address of Constants Contract
+    function updateConstantsContract(address newAddress) public onlyOwner {
+        // Update the address of the Constants Contract
+        // This function should only be called by the owner
+        // The Constants Contract should be updated whenever the contract is deployed
+        // to a new address
+        constants = ConstantsContract(newAddress);
     }
 
     mapping(address => Customer) public customers;
@@ -166,20 +179,23 @@ contract User is Ownable {
         Tier newTier = Tier(max(uint(currentTier) - 1, 0)); // if no tier is applicable, downgrade tier
         if (
             currentTier == Tier.Basic &&
-            totalTokensEarned >= 100 &&
-            totalTransactions >= 10
+            totalTokensEarned >=
+            constants.getIntegerConstant("BRONZE_REQ_TOKENS") &&
+            totalTransactions >= constants.getIntegerConstant("BRONZE_REQ_TXNS")
         ) {
             newTier = Tier.Bronze;
         } else if (
             currentTier == Tier.Bronze &&
-            totalTokensEarned >= 250 &&
-            totalTransactions >= 20
+            totalTokensEarned >=
+            constants.getIntegerConstant("SILVER_REQ_TOKENS") &&
+            totalTransactions >= constants.getIntegerConstant("SILVER_REQ_TXNS")
         ) {
             newTier = Tier.Silver;
         } else if (
             currentTier >= Tier.Silver &&
-            totalTokensEarned >= 500 &&
-            totalTransactions >= 40
+            totalTokensEarned >=
+            constants.getIntegerConstant("GOLD_REQ_TOKENS") &&
+            totalTransactions >= constants.getIntegerConstant("GOLD_REQ_TXNS")
         ) {
             newTier = Tier.Gold;
         }

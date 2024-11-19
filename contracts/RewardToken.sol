@@ -9,6 +9,7 @@ import "./models/Group.sol";
 
 import "./Marketplace.sol";
 import "./User.sol";
+import "./Constants.sol";
 
 contract RewardToken is ERC20, Ownable {
     constructor(
@@ -32,9 +33,12 @@ contract RewardToken is ERC20, Ownable {
     mapping(address => mapping(address => uint256))
         private userLastTransactionTimestampForStore;
     mapping(address => Group) private groups; // ongoing Group transactions, customer -> Group
+    mapping(address => mapping(address => uint256))
+        private customerStoreTransactionCounts; // customer -> store -> transactions at that store
 
     Marketplace private marketplace;
     User private user;
+    ConstantsContract private constants;
 
     event StoreAdded(address indexed store);
     event CustomerAdded(address indexed customer);
@@ -152,6 +156,15 @@ contract RewardToken is ERC20, Ownable {
     //
     //////////////////////////////////////////
 
+    // Address of Constants Contract
+    function updateConstantsContract(address newAddress) public onlyOwner {
+        // Update the address of the Constants Contract
+        // This function should only be called by the owner
+        // The Constants Contract should be updated whenever the contract is deployed
+        // to a new address
+        constants = ConstantsContract(newAddress);
+    }
+
     // Allow owner transfers to anyone
     function ownerTransfer(
         address from,
@@ -180,11 +193,24 @@ contract RewardToken is ERC20, Ownable {
         uint256 transactionId,
         address storeAddress
     ) public onlyOwner burnExpiredTokens {
-        uint256 expiration = block.timestamp + 4 * 6 weeks; // 6 months
+        uint256 tokenExpiryMonths = constants.getIntegerConstant(
+            "TOKEN_EXPIRY_MONTHS"
+        );
+        uint256 expiration = block.timestamp + tokenExpiryMonths * 4 weeks; // 6 months
         uint256 amount = calculateTokensToMint(txnAmount);
+
+        customerStoreTransactionCounts[customer][storeAddress]++;
+        if (
+            customerStoreTransactionCounts[customer][storeAddress] ==
+            constants.getIntegerConstant("TOKEN_BONUS_TXN_COUNT")
+        ) {
+            amount += constants.getIntegerConstant("TOKEN_BONUS_TOKEN_AMOUNT"); // Add a bonus of 20 tokens after 20 transactions at the same store
+        }
+
         mintTokens(customer, amount, expiration, transactionId);
         userLastTransactionTimestampForStore[customer][storeAddress] = block
             .timestamp;
+
         emit TransactionRecorded(customer, amount, transactionId, storeAddress);
     }
 
@@ -196,13 +222,18 @@ contract RewardToken is ERC20, Ownable {
         uint256 tokensPerDollar;
 
         // Define peak hours in SGT
-        bool isPeakHour = (hour >= 12 && hour < 14) ||
-            (hour >= 18 && hour < 20);
+        bool isPeakHour = (hour >=
+            constants.getIntegerConstant("PEAK_HR_START_1") &&
+            hour < constants.getIntegerConstant("PEAK_HR_END_1")) ||
+            (hour >= constants.getIntegerConstant("PEAK_HR_START_2") &&
+                hour < constants.getIntegerConstant("PEAK_HR_END_2"));
 
         if (isPeakHour) {
-            tokensPerDollar = 5;
+            tokensPerDollar = constants.getIntegerConstant("PEAK_HR_TOKENS");
         } else {
-            tokensPerDollar = 10;
+            tokensPerDollar = constants.getIntegerConstant(
+                "NON_PEAK_HR_TOKENS"
+            );
         }
 
         return txnAmount * tokensPerDollar;
@@ -217,7 +248,7 @@ contract RewardToken is ERC20, Ownable {
         require(
             block.timestamp -
                 userLastTransactionTimestampForStore[_msgSender()][store] <=
-                30 days
+                constants.getIntegerConstant("MIN_DAYS_LAST_TXN") * 1 days
         );
         require(
             balanceOf(_msgSender()) < productToRedeem.price,
@@ -321,6 +352,14 @@ contract RewardToken is ERC20, Ownable {
             productToRedeem.price
         );
         deleteGroup(customer);
+    }
+
+    // Function to be called by the backend to clear the transaction count for a customer at a store at the end of each month
+    function clearCustomerTransactionStoreCount(
+        address customer,
+        address store
+    ) public onlyOwner {
+        delete customerStoreTransactionCounts[customer][store];
     }
 
     //////////////////////////////////////////
