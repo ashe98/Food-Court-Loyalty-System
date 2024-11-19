@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./models/Product.sol";
+import "./models/Tier.sol";
 
 contract Marketplace is Ownable {
     constructor() Ownable(msg.sender) {}
@@ -94,7 +95,7 @@ contract Marketplace is Ownable {
         uint256 _quantity,
         bool _claimableOnce,
         bool _groupClaimable,
-        uint256 _minimumTierRequired
+        Tier _minimumTierRequired
     ) public returns (uint256) {
         require(_price > 0, "Price must be greater than 0");
         require(_quantity > 0, "Quantity must be greater than 0");
@@ -106,7 +107,7 @@ contract Marketplace is Ownable {
             quantity: _quantity,
             claimableOnce: _claimableOnce,
             groupClaimable: _groupClaimable,
-            minimumTierRequired: _minimumTierRequired,
+            minimumTierRequired: uint(_minimumTierRequired),
             isActive: true
         });
         allProductIds.push(_productId);

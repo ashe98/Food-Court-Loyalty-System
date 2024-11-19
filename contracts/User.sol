@@ -8,6 +8,12 @@ import "./models/Tier.sol";
 contract User is Ownable {
     constructor() Ownable(msg.sender) {}
 
+    // Struct to store monthly transaction history for each user
+    struct MonthlyTransactionHistory {
+        uint256 totalTokensEarned;
+        uint256 totalTransactions;
+    }
+
     struct Customer {
         address customerAddress;
         Tier tier;
@@ -37,29 +43,51 @@ contract User is Ownable {
 
     mapping(address => Customer) public customers;
     mapping(address => Store) public stores;
+    mapping(address => MonthlyTransactionHistory)
+        public monthlyTransactionHistory;
 
-    event CustomerRegistered(address customerAddress, uint256 tier);
+    //////////////////////////////////////////
+    //
+    // Events
+    //
+    //////////////////////////////////////////
+
+    event CustomerRegistered(address customerAddress);
     event StoreRegistered(address storeAddress);
+    event TransactionRecorded(
+        address customerAddress,
+        uint256 tokensEarned,
+        uint256 totalTransactions
+    );
+    event TierUpdated(address customerAddress, Tier newTier);
+
+    //////////////////////////////////////////
+
+    //////////////////////////////////////////
+    //
+    // Public functions
+    //
+    //////////////////////////////////////////
 
     // Function to register new customer
-    function registerCustomer(Tier _tier) public {
+    function registerCustomer() public whiteListedContractsOnly {
         require(
-            customers[msg.sender].customerAddress == address(0),
+            customers[tx.origin].customerAddress == address(0),
             "Customer already registered"
         );
         Customer memory newCustomer = Customer({
-            customerAddress: msg.sender,
-            tier: _tier
+            customerAddress: tx.origin,
+            tier: Tier.Basic
         });
-        customers[msg.sender] = newCustomer;
-        emit CustomerRegistered(msg.sender, uint256(_tier));
+        customers[tx.origin] = newCustomer;
+        emit CustomerRegistered(tx.origin);
     }
 
     //Function to register new store
-    function registerStore() public {
-        Store memory newStore = Store({storeAddress: msg.sender});
-        stores[msg.sender] = newStore;
-        emit StoreRegistered(msg.sender);
+    function registerStore() public whiteListedContractsOnly {
+        Store memory newStore = Store({storeAddress: tx.origin});
+        stores[tx.origin] = newStore;
+        emit StoreRegistered(tx.origin);
     }
 
     //Function to get customer details
@@ -109,5 +137,58 @@ contract User is Ownable {
             "Store not found"
         );
         delete stores[storeAddress];
+    }
+
+    //Function to update transaction history for user
+    function recordTransaction(
+        address customerAddress,
+        uint256 tokensEarned
+    ) public whiteListedContractsOnly {
+        monthlyTransactionHistory[customerAddress]
+            .totalTokensEarned += tokensEarned;
+        monthlyTransactionHistory[customerAddress].totalTransactions += 1;
+        emit TransactionRecorded(
+            customerAddress,
+            tokensEarned,
+            monthlyTransactionHistory[customerAddress].totalTransactions
+        );
+    }
+
+    // Function to be called by the Backend at the end of each month to revise the Tier of each user
+    function calculateTierForUsers(
+        address customerAddress
+    ) public whiteListedContractsOnly {
+        uint256 totalTokensEarned = monthlyTransactionHistory[customerAddress]
+            .totalTokensEarned;
+        uint256 totalTransactions = monthlyTransactionHistory[customerAddress]
+            .totalTransactions;
+        Tier currentTier = customers[customerAddress].tier;
+        Tier newTier = Tier(max(uint(currentTier) - 1, 0)); // if no tier is applicable, downgrade tier
+        if (
+            currentTier == Tier.Basic &&
+            totalTokensEarned >= 100 &&
+            totalTransactions >= 10
+        ) {
+            newTier = Tier.Bronze;
+        } else if (
+            currentTier == Tier.Bronze &&
+            totalTokensEarned >= 250 &&
+            totalTransactions >= 20
+        ) {
+            newTier = Tier.Silver;
+        } else if (
+            currentTier >= Tier.Silver &&
+            totalTokensEarned >= 500 &&
+            totalTransactions >= 40
+        ) {
+            newTier = Tier.Gold;
+        }
+        customers[customerAddress].tier = newTier;
+        delete monthlyTransactionHistory[customerAddress]; // reset transaction history
+        emit TierUpdated(customerAddress, newTier);
+    }
+
+    function max(uint256 a, uint256 b) public pure returns (uint256) {
+        return a >= b ? a : b;
     }
 }

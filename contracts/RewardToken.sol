@@ -8,12 +8,15 @@ import "./models/Product.sol";
 import "./models/Group.sol";
 
 import "./Marketplace.sol";
+import "./User.sol";
 
 contract RewardToken is ERC20, Ownable {
     constructor(
-        address marketplaceAddress
+        address marketplaceAddress,
+        address userAddress
     ) ERC20("RewardToken", "RT") Ownable(msg.sender) {
         marketplace = Marketplace(marketplaceAddress);
+        user = User(userAddress);
     }
 
     // Struct to store how many tokens a customer has and when they expire
@@ -31,10 +34,15 @@ contract RewardToken is ERC20, Ownable {
     mapping(address => Group) private groups; // ongoing Group transactions, customer -> Group
 
     Marketplace private marketplace;
+    User private user;
 
     event StoreAdded(address indexed store);
     event CustomerAdded(address indexed customer);
-    event TokensMinted(address indexed customer, uint256 amount, uint256 expiration);
+    event TokensMinted(
+        address indexed customer,
+        uint256 amount,
+        uint256 expiration
+    );
     event TokensBurned(address indexed customer, uint256 amount);
     event GroupCreated(address indexed originator, uint256 timestamp);
     event GroupJoined(address indexed member, address indexed groupOriginator);
@@ -44,13 +52,13 @@ contract RewardToken is ERC20, Ownable {
         uint256 amount,
         uint256 transactionId,
         address indexed store
-        );
+    );
     event GroupTransactionCompleted(
         address indexed groupOriginator,
         uint256 indexed productId,
         uint256 memberCount,
         uint256 totalAmount
-        );
+    );
     //////////////////////////////////////////
     //
     // Modifiers
@@ -155,6 +163,7 @@ contract RewardToken is ERC20, Ownable {
 
     function addStore(address store) public {
         isStore[store] = true;
+        user.registerStore();
         emit StoreAdded(store);
     }
 
@@ -193,10 +202,15 @@ contract RewardToken is ERC20, Ownable {
             balanceOf(_msgSender()) < productToRedeem.price,
             "Customer does not have enough tokens to redeem"
         );
+        require(
+            uint(user.getUserTier(_msgSender())) >=
+                productToRedeem.minimumTierRequired,
+            "Customer does not have the required tier to redeem this product"
+        );
         marketplace.redeemProduct(productId, 1); // reduce product quantity
         transfer(store, productToRedeem.price);
     }
-    
+
     // Creates a new group for group purchases
     function createGroup() public burnExpiredTokens {
         address customer = _msgSender();
@@ -232,7 +246,7 @@ contract RewardToken is ERC20, Ownable {
             );
         }
         groups[groupOriginator].members.push(customer);
-        emit GroupJoined(customer, groupOriginator); 
+        emit GroupJoined(customer, groupOriginator);
     }
 
     function makeGroupTransaction(
@@ -257,6 +271,11 @@ contract RewardToken is ERC20, Ownable {
         require(
             productToRedeem.groupClaimable,
             "Product is not group claimable"
+        );
+        require(
+            uint(user.getUserTier(groups[customer].originator)) >=
+                productToRedeem.minimumTierRequired,
+            "Group originator does not have the required tier to redeem this product"
         );
         uint256 groupSize = groups[customer].members.length;
         for (uint256 i = 0; i < groupSize; i++) {
