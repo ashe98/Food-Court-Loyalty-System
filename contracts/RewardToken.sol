@@ -176,15 +176,36 @@ contract RewardToken is ERC20, Ownable {
     // The backend should calculate the amount of tokens to be minted based on the transaction amount and time of day
     function recordTransaction(
         address customer,
-        uint256 amount,
+        uint256 txnAmount,
         uint256 transactionId,
         address storeAddress
     ) public onlyOwner burnExpiredTokens {
         uint256 expiration = block.timestamp + 4 * 6 weeks; // 6 months
+        uint256 amount = calculateTokensToMint(txnAmount);
         mintTokens(customer, amount, expiration, transactionId);
         userLastTransactionTimestampForStore[customer][storeAddress] = block
             .timestamp;
         emit TransactionRecorded(customer, amount, transactionId, storeAddress);
+    }
+
+    // In Production, ChainLink should be used to get the exact time of the transaction
+    function calculateTokensToMint(
+        uint256 txnAmount
+    ) public view returns (uint256) {
+        uint256 hour = ((block.timestamp + 8 * 60 * 60) / 60 / 60) % 24; // Convert to SGT (UTC+8)
+        uint256 tokensPerDollar;
+
+        // Define peak hours in SGT
+        bool isPeakHour = (hour >= 12 && hour < 14) ||
+            (hour >= 18 && hour < 20);
+
+        if (isPeakHour) {
+            tokensPerDollar = 5;
+        } else {
+            tokensPerDollar = 10;
+        }
+
+        return txnAmount * tokensPerDollar;
     }
 
     function redeemTokensForCustomer(
