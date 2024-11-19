@@ -8,7 +8,7 @@ import "./Constants.sol";
 import "./models/Tier.sol";
 
 contract User is Ownable {
-    constructor() Ownable(msg.sender) {}
+    constructor() Ownable() {}
 
     // Struct to store monthly transaction history for each user
     struct MonthlyTransactionHistory {

@@ -15,7 +15,7 @@ contract RewardToken is ERC20, Ownable {
     constructor(
         address marketplaceAddress,
         address userAddress
-    ) ERC20("RewardToken", "RT") Ownable(msg.sender) {
+    ) ERC20("RewardToken", "RT") Ownable() {
         marketplace = Marketplace(marketplaceAddress);
         user = User(userAddress);
     }
@@ -385,32 +385,26 @@ contract RewardToken is ERC20, Ownable {
         if (!isCustomer[customer]) {
             return;
         }
-        uint256 length = tokenBatches[customer].length;
-        uint256 expiredAmount = 0;
-        uint256[] memory expiredIndexes = new uint256[](length);
 
-        // first find expired token batches
-        for (uint256 i = 0; i < length; i++) {
-            if (tokenBatches[customer][i].expiration < block.timestamp) {
-                expiredAmount += tokenBatches[customer][i].amount;
-            } else {
-                expiredIndexes[i] = 1;
+        uint256 expiredAmount = 0;
+        TokenBatch[] storage customerBatches = tokenBatches[customer];
+
+        // Collect indices of expired tokens
+        for (uint256 i = 0; i < customerBatches.length; i++) {
+            if (customerBatches[i].expiration < block.timestamp) {
+                expiredAmount += customerBatches[i].amount;
+
+                // Remove expired tokens by shifting elements
+                customerBatches[i] = customerBatches[
+                    customerBatches.length - 1
+                ];
+                customerBatches.pop();
+                i--; // Adjust index after removal
             }
         }
 
-        // update the token batches array for the customer
         if (expiredAmount > 0) {
-            uint256 newLength = length - expiredAmount;
-            TokenBatch[] memory newTokenBatches = new TokenBatch[](newLength);
-            uint256 j = 0;
-            for (uint256 i = 0; i < length; i++) {
-                if (expiredIndexes[i] == 1) {
-                    newTokenBatches[j] = tokenBatches[customer][i];
-                    j++;
-                }
-            }
-            tokenBatches[customer] = newTokenBatches;
-            _burn(customer, expiredAmount); // burn the expired token amount
+            _burn(customer, expiredAmount); // Burn the expired token amount
             emit TokensBurned(customer, expiredAmount);
         }
     }

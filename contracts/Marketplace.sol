@@ -6,7 +6,7 @@ import "./models/Product.sol";
 import "./models/Tier.sol";
 
 contract Marketplace is Ownable {
-    constructor() Ownable(msg.sender) {}
+    constructor() Ownable() {}
 
     //////////////////////////////////////////
     //
