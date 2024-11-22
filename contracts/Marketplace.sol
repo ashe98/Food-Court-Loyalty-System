@@ -152,8 +152,8 @@ contract Marketplace is Ownable {
             "Not enough quantity"
         );
         require(
-            hasUserClaimed[tx.origin][_productId] &&
-                products[_productId].claimableOnce,
+            !products[_productId].claimableOnce ||
+                !hasUserClaimed[tx.origin][_productId],
             "Already claimed by user"
         );
         hasUserClaimed[msg.sender][_productId] = true;

@@ -1,0 +1,44 @@
+const Constants = await ConstantsContract.deployed();
+const Marketplace = await Marketplace.deployed();
+const User = await User.deployed();
+const RewardToken = await RewardToken.deployed();
+
+
+await User.addWhiteListedContract(RewardToken.address);
+await User.addWhiteListedContract(accounts[0]);
+await Marketplace.addWhiteListedContract(RewardToken.address);
+await RewardToken.updateConstantsContract(Constants.address);
+await User.updateConstantsContract(Constants.address);
+
+// Registration
+await RewardToken.addCustomer(accounts[1], {from: accounts[0]});
+await User.getCustomer(accounts[1]);
+await RewardToken.addStore(accounts[2], {from: accounts[0]});
+
+// Adding product
+await Marketplace.addProduct(1,"Product A", 50, 100, false, true, 1, {from: accounts[2]});
+
+// Claiming product with low loyalty tier level
+await RewardToken.recordTransaction(accounts[1],30,1,accounts[2],{from: accounts[0]});
+await RewardToken.balanceOf(accounts[1]);
+await RewardToken.redeemTokensForCustomer(1, accounts[2], {from: accounts[1]});
+
+// Claiming product
+await Marketplace.addProduct(2,"Product B", 50, 100, false, true, 0, {from: accounts[2]});
+await RewardToken.redeemTokensForCustomer(2, accounts[2], {from: accounts[1]});
+await Marketplace.getProductById(2);
+
+// Group transactions
+await RewardToken.addCustomer(accounts[3], {from: accounts[0]});
+await RewardToken.addCustomer(accounts[4], {from: accounts[0]});
+await RewardToken.recordTransaction(accounts[3],30,1,accounts[2],{from: accounts[0]});
+await RewardToken.recordTransaction(accounts[4],30,1,accounts[2],{from: accounts[0]});
+await Marketplace.addProduct(3,"Product Group Claimable", 50, 100, false, true, 0, {from: accounts[2]});
+await RewardToken.createGroup({from: accounts[1]});
+await RewardToken.joinGroup(accounts[1], {from: accounts[3]});
+await RewardToken.joinGroup(accounts[1], {from: accounts[4]});
+
+// Loyalty tier
+await User.calculateTierForUsers(accounts[1], {from: accounts[0]});
+await User.getCustomer(accounts[1]);
+

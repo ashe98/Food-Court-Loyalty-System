@@ -83,24 +83,26 @@ contract User is Ownable {
     //////////////////////////////////////////
 
     // Function to register new customer
-    function registerCustomer() public whiteListedContractsOnly {
+    function registerCustomer(
+        address customerAddress
+    ) public whiteListedContractsOnly {
         require(
-            customers[tx.origin].customerAddress == address(0),
+            customers[customerAddress].customerAddress == address(0),
             "Customer already registered"
         );
         Customer memory newCustomer = Customer({
-            customerAddress: tx.origin,
+            customerAddress: customerAddress,
             tier: Tier.Basic
         });
-        customers[tx.origin] = newCustomer;
-        emit CustomerRegistered(tx.origin);
+        customers[customerAddress] = newCustomer;
+        emit CustomerRegistered(customerAddress);
     }
 
     //Function to register new store
-    function registerStore() public whiteListedContractsOnly {
-        Store memory newStore = Store({storeAddress: tx.origin});
-        stores[tx.origin] = newStore;
-        emit StoreRegistered(tx.origin);
+    function registerStore(address store) public whiteListedContractsOnly {
+        Store memory newStore = Store({storeAddress: store});
+        stores[store] = newStore;
+        emit StoreRegistered(store);
     }
 
     //Function to get customer details
@@ -176,7 +178,15 @@ contract User is Ownable {
         uint256 totalTransactions = monthlyTransactionHistory[customerAddress]
             .totalTransactions;
         Tier currentTier = customers[customerAddress].tier;
-        Tier newTier = Tier(max(uint(currentTier) - 1, 0)); // if no tier is applicable, downgrade tier
+        Tier newTier;
+
+        // Downgrade tier if no tier is applicable
+        if (currentTier == Tier.Basic) {
+            newTier = Tier.Basic;
+        } else {
+            newTier = Tier(uint(currentTier) - 1);
+        }
+
         if (
             currentTier == Tier.Basic &&
             totalTokensEarned >=
@@ -199,6 +209,7 @@ contract User is Ownable {
         ) {
             newTier = Tier.Gold;
         }
+
         customers[customerAddress].tier = newTier;
         delete monthlyTransactionHistory[customerAddress]; // reset transaction history
         emit TierUpdated(customerAddress, newTier);

@@ -176,17 +176,17 @@ contract RewardToken is ERC20, Ownable {
 
     function addStore(address store) public {
         isStore[store] = true;
-        user.registerStore();
+        user.registerStore(store);
         emit StoreAdded(store);
     }
 
     function addCustomer(address customer) public {
         isCustomer[customer] = true;
+        user.registerCustomer(customer);
         emit CustomerAdded(customer);
     }
 
     // The backend(owner) should make necessary checks to verify the transaction before calling this function
-    // The backend should calculate the amount of tokens to be minted based on the transaction amount and time of day
     function recordTransaction(
         address customer,
         uint256 txnAmount,
@@ -210,7 +210,7 @@ contract RewardToken is ERC20, Ownable {
         mintTokens(customer, amount, expiration, transactionId);
         userLastTransactionTimestampForStore[customer][storeAddress] = block
             .timestamp;
-
+        user.recordTransaction(customer, amount);
         emit TransactionRecorded(customer, amount, transactionId, storeAddress);
     }
 
@@ -251,7 +251,7 @@ contract RewardToken is ERC20, Ownable {
                 constants.getIntegerConstant("MIN_DAYS_LAST_TXN") * 1 days
         );
         require(
-            balanceOf(_msgSender()) < productToRedeem.price,
+            balanceOf(_msgSender()) >= productToRedeem.price,
             "Customer does not have enough tokens to redeem"
         );
         require(
@@ -274,7 +274,7 @@ contract RewardToken is ERC20, Ownable {
             groups[customer].originator == address(0),
             "Customer already has an ongoing group transaction"
         );
-        address[] memory members = new address[](5);
+        address[] memory members = new address[](1);
         members[0] = customer;
         groups[customer] = Group(customer, members, block.timestamp);
         emit GroupCreated(customer, block.timestamp);
@@ -315,7 +315,7 @@ contract RewardToken is ERC20, Ownable {
             "Customer does not have an ongoing group transaction"
         );
         require(groups[customer].members.length > 1, "Group is empty");
-        if (block.timestamp - groups[customer].createdAt <= 30 minutes) {
+        if (block.timestamp - groups[customer].createdAt > 30 minutes) {
             deleteGroup(customer); // Delete group if expired
             require(false, "Group transaction expired");
         }
@@ -330,11 +330,18 @@ contract RewardToken is ERC20, Ownable {
             "Group originator does not have the required tier to redeem this product"
         );
         uint256 groupSize = groups[customer].members.length;
+        uint256 baseAmount = productToRedeem.price / groupSize;
+        uint256 remainder = productToRedeem.price % groupSize;
+
         for (uint256 i = 0; i < groupSize; i++) {
             address member = groups[customer].members[i];
             _burnExpiredTokens(member);
+            uint256 amountToTransfer = baseAmount;
+            if (i < remainder) {
+                amountToTransfer += 1; // Distribute the remainder
+            }
             require(
-                balanceOf(member) < productToRedeem.price / groupSize,
+                balanceOf(member) >= amountToTransfer,
                 "Customer does not have enough tokens to redeem"
             );
         }
@@ -343,7 +350,11 @@ contract RewardToken is ERC20, Ownable {
         marketplace.redeemProduct(productId, 1);
         for (uint256 i = 0; i < groupSize; i++) {
             address member = groups[customer].members[i];
-            transferFrom(member, store, productToRedeem.price / groupSize);
+            uint256 amountToTransfer = baseAmount;
+            if (i < remainder) {
+                amountToTransfer += 1; // Distribute the remainder
+            }
+            super._transfer(member, store, amountToTransfer);
         }
         emit GroupTransactionCompleted(
             customer,
