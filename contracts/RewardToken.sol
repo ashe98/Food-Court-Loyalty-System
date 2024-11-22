@@ -210,7 +210,7 @@ contract RewardToken is ERC20, Ownable {
         mintTokens(customer, amount, expiration, transactionId);
         userLastTransactionTimestampForStore[customer][storeAddress] = block
             .timestamp;
-        user.recordTransaction(customer, amount);
+        user.recordTransaction(customer, storeAddress, amount);
         emit TransactionRecorded(customer, amount, transactionId, storeAddress);
     }
 
@@ -261,6 +261,12 @@ contract RewardToken is ERC20, Ownable {
         );
         marketplace.redeemProduct(productId, 1); // reduce product quantity
         transfer(store, productToRedeem.price);
+        user.recordTokenRedemption(
+            _msgSender(),
+            store,
+            productId,
+            productToRedeem.price
+        );
     }
 
     // Creates a new group for group purchases

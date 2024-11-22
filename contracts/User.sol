@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "./Constants.sol";
 
 import "./models/Tier.sol";
+import "./models/TransactionType.sol";
 
 contract User is Ownable {
     constructor() Ownable() {}
@@ -14,6 +15,20 @@ contract User is Ownable {
     struct MonthlyTransactionHistory {
         uint256 totalTokensEarned;
         uint256 totalTransactions;
+    }
+
+    struct UserTransactionHistory {
+        address storeAddress;
+        uint256 productId; // will be 0 if no product is involved i.e. tokens earned
+        uint256 tokensInvolved;
+        TransactionType transactionType; // whether tokens earned or spent
+    }
+
+    struct StoreTransactionHistory {
+        address customerAddress;
+        uint256 productId;
+        uint256 tokensInvolved;
+        TransactionType transactionType;
     }
 
     struct Customer {
@@ -58,6 +73,9 @@ contract User is Ownable {
     mapping(address => Store) public stores;
     mapping(address => MonthlyTransactionHistory)
         public monthlyTransactionHistory;
+    mapping(address => UserTransactionHistory[]) public userTransactionHistory;
+    mapping(address => StoreTransactionHistory[])
+        public storeTransactionHistory;
 
     //////////////////////////////////////////
     //
@@ -157,16 +175,67 @@ contract User is Ownable {
     //Function to update transaction history for user
     function recordTransaction(
         address customerAddress,
+        address storeAddress,
         uint256 tokensEarned
     ) public whiteListedContractsOnly {
         monthlyTransactionHistory[customerAddress]
             .totalTokensEarned += tokensEarned;
         monthlyTransactionHistory[customerAddress].totalTransactions += 1;
+
+        userTransactionHistory[customerAddress].push(
+            UserTransactionHistory({
+                storeAddress: storeAddress,
+                productId: 0,
+                tokensInvolved: tokensEarned,
+                transactionType: TransactionType.TokensEarned
+            })
+        );
+
         emit TransactionRecorded(
             customerAddress,
             tokensEarned,
             monthlyTransactionHistory[customerAddress].totalTransactions
         );
+    }
+
+    // Function to update user's transaction history for tokens spent
+    // And update store's transaction history for tokens earned
+    function recordTokenRedemption(
+        address customerAddress,
+        address storeAddress,
+        uint256 productId,
+        uint256 tokensSpent
+    ) public whiteListedContractsOnly {
+        userTransactionHistory[customerAddress].push(
+            UserTransactionHistory({
+                storeAddress: storeAddress,
+                productId: productId,
+                tokensInvolved: tokensSpent,
+                transactionType: TransactionType.TokensSpent
+            })
+        );
+        storeTransactionHistory[storeAddress].push(
+            StoreTransactionHistory({
+                customerAddress: customerAddress,
+                productId: productId,
+                tokensInvolved: tokensSpent,
+                transactionType: TransactionType.TokensEarned
+            })
+        );
+    }
+
+    // Function to get user's transaction history
+    function getUserTransactionHistory(
+        address customerAddress
+    ) public view returns (UserTransactionHistory[] memory) {
+        return (userTransactionHistory[customerAddress]);
+    }
+
+    // Function to get store's transaction history
+    function getStoreTransactionHistory(
+        address storeAddress
+    ) public view returns (StoreTransactionHistory[] memory) {
+        return (storeTransactionHistory[storeAddress]);
     }
 
     // Function to be called by the Backend at the end of each month to revise the Tier of each user
